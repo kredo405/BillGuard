@@ -228,7 +228,7 @@ export default function ReportsPage() {
                     data={chartData}
                     cx="50%"
                     cy="50%"
-                    outerRadius={150}
+                    outerRadius="70%"
                     fill="#8884d8"
                     dataKey="value"
                     nameKey="name"
