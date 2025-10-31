@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { TrendingDown, BarChart2, Loader2, BrainCircuit, X as CloseIcon, Save } from 'lucide-react';
 
 import { supabase } from '@/lib/supabase';
@@ -18,14 +18,16 @@ const MetricCard = ({ title, value, icon: Icon, colorClass, bgColorClass }) => (
     </div>
 );
 
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1919', '#19FFD4', '#FF19B8', '#1976D2', '#FF5722'];
+
 const AnalysisModal = ({ analysis, onClose, onSave, isSaving }) => (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-8 relative">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-8 relative">
             <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
                 <CloseIcon size={24} />
             </button>
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">Анализ расходов</h2>
-            <div className="prose max-w-none text-gray-900" dangerouslySetInnerHTML={{ __html: analysis.replace(/\n/g, '<br />') }} />
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4">Анализ расходов</h2>
+            <div className="prose max-w-full text-gray-900" dangerouslySetInnerHTML={{ __html: analysis.replace(/\n/g, '<br />') }} />
             <div className="text-right mt-6">
                 <button onClick={onSave} disabled={isSaving} className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-[1.01] flex items-center disabled:bg-green-400 disabled:cursor-not-allowed">
                     {isSaving ? <><Loader2 className="animate-spin h-5 w-5 mr-3" />Сохранение...</> : <><Save className="w-5 h-5 mr-2"/>Сохранить отчет</>}</button>
@@ -189,9 +191,9 @@ export default function ReportsPage() {
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
       {isAnalysisModalOpen && <AnalysisModal analysis={analysisResult} onClose={() => setIsAnalysisModalOpen(false)} onSave={handleSaveReport} isSaving={isSaving} />} 
       <div className="w-full max-w-6xl mx-auto p-6 bg-white rounded-3xl shadow-2xl border-t-8 border-teal-500">
-        <div className="flex justify-between items-center border-b pb-4 mb-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center border-b pb-4 mb-8">
             <h1 className="text-3xl font-extrabold text-gray-900">Финансовые Отчеты</h1>
-            <div className="flex items-center gap-2 p-1 rounded-lg bg-gray-100">
+            <div className="flex flex-wrap items-center gap-2 p-1 rounded-lg bg-gray-100 mt-4 sm:mt-0">
                 <button onClick={() => setTimeRange('week')} className={`px-3 py-1 text-sm font-semibold rounded-md transition-colors ${timeRange === 'week' ? 'bg-white text-teal-600 shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Неделя</button>
                 <button onClick={() => setTimeRange('month')} className={`px-3 py-1 text-sm font-semibold rounded-md transition-colors ${timeRange === 'month' ? 'bg-white text-teal-600 shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Месяц</button>
                 <button onClick={() => setTimeRange('year')} className={`px-3 py-1 text-sm font-semibold rounded-md transition-colors ${timeRange === 'year' ? 'bg-white text-teal-600 shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Год</button>
@@ -221,14 +223,27 @@ export default function ReportsPage() {
             </h2>
             {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" tickFormatter={formatCurrency} />
-                  <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 12 }} />
+                <PieChart margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                  <Pie
+                    data={chartData}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={150}
+                    fill="#8884d8"
+                    dataKey="value"
+                    nameKey="name"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {
+                      chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))
+                    }
+                  </Pie>
                   <Tooltip formatter={(value) => formatCurrency(value)} />
                   <Legend />
-                  <Bar dataKey="value" name="Расход" fill="#0088FE" />
-                </BarChart>
+                </PieChart>
               </ResponsiveContainer>
             ) : (
               <p className="text-center text-gray-500 p-8">Нет данных о расходах для отображения графика.</p>

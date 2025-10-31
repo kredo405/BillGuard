@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { ChevronDown } from 'lucide-react';
 
 const InputField = ({ label, id, type = 'text', value, onChange, required = false, placeholder = '', list = '' }) => (
   <div className="space-y-1">
@@ -152,7 +153,7 @@ export default function ManagePaymentsPage() {
             required
           />
 
-          <div>
+          <div className="relative">
             <label htmlFor="category" className="block text-sm font-medium text-gray-700">Категория</label>
             <input
               id="category"
@@ -160,8 +161,9 @@ export default function ManagePaymentsPage() {
               list="categories-list"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full p-3 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-4 focus:ring-teal-500/50 focus:border-teal-500 transition duration-150 ease-in-out text-gray-900"
+              className="w-full p-3 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-4 focus:ring-teal-500/50 focus:border-teal-500 transition duration-150 ease-in-out text-gray-900 pr-10"
             />
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             <datalist id="categories-list">
               {categories.map((cat) => (
                 <option key={cat} value={cat} />
