@@ -44,14 +44,14 @@ export default function Navbar() {
 
   // Ссылки для аутентифицированного пользователя
   const userLinks = [
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/reports", label: "Reports", icon: ScrollText },
-    { href: "/expenses", label: "Expenses", icon: PlusCircle },
-    { href: "/income", label: "Income", icon: PlusCircle },
-    { href: "/receipts", label: "Receipts", icon: PlusCircle },
+    { href: "/dashboard", label: "Панель", icon: LayoutDashboard },
+    { href: "/reports", label: "Отчеты", icon: ScrollText },
+    { href: "/reports/history", label: "История", icon: ScrollText },
+    { href: "/expenses", label: "Расходы", icon: PlusCircle },
+    { href: "/receipts", label: "Чеки", icon: PlusCircle },
+    { href: "/expenses/recurring", label: "Регулярные", icon: PlusCircle },
     // Ссылку на /payments/manage я убрал из-за её специфичности, но вы можете вернуть её при необходимости
   ];
-
   return (
     // Навигационная панель с эффектом "прилипания" и тенью
     <nav className="sticky top-0 z-50 bg-white shadow-lg border-b border-gray-100">
@@ -97,7 +97,7 @@ export default function Navbar() {
             <button 
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
               className="p-2 text-gray-600 hover:text-blue-600 focus:outline-none"
-              aria-label="Toggle menu"
+              aria-label="Переключить меню"
             >
               {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
@@ -118,7 +118,7 @@ export default function Navbar() {
                     key={item.href} 
                     href={item.href} 
                     onClick={() => setIsMobileMenuOpen(false)} // Закрыть после клика
-                    className="w-full text-left py-2 px-3 rounded-md text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                    className="w-full text-left py-2 px-3 rounded-md text-gray-900 hover:bg-gray-50 flex items-center space-x-2"
                   >
                     <item.icon size={18} className="text-blue-500" />
                     <span>{item.label}</span>
@@ -137,7 +137,7 @@ export default function Navbar() {
                 <Link 
                   href="/login" 
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="w-full text-left py-2 px-3 rounded-md text-gray-700 hover:bg-gray-50"
+                  className="w-full text-left py-2 px-3 rounded-md text-gray-900 hover:bg-gray-50"
                 >
                   Войти
                 </Link>

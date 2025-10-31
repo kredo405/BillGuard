@@ -8,7 +8,7 @@ export default function ExpensesPage() {
   const [loading, setLoading] = useState(true);
 
   // Имитация данных для карточек статистики
-  const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0).toFixed(2);
+  const totalExpenses = expenses.reduce((sum, expense) => sum + parseFloat(expense.amount), 0).toFixed(2);
   const totalItems = expenses.length;
   // Условно-положительный/отрицательный тренд (для демонстрации)
   const isTrendPositive = expenses.length % 2 === 0; 
@@ -60,7 +60,11 @@ export default function ExpensesPage() {
         </div>
       </div>
       <div className="mt-1 flex items-baseline">
-        <p className="text-3xl font-extrabold text-gray-900">${value}</p>
+        {title === "Общая Сумма" ?
+         <p className="text-3xl font-extrabold text-gray-900">BYN {value}</p> 
+         : 
+         <p className="text-3xl font-extrabold text-gray-900">{value}</p>}
+        
         {trend && (
           <span className={`ml-2 text-sm font-semibold ${trendColor}`}>
             {isTrendPositive ? "↑" : "↓"} {trend}
@@ -148,7 +152,7 @@ export default function ExpensesPage() {
                                 {expense.description}
                             </td>
                             <td className={`py-3 px-4 whitespace-nowrap text-sm font-bold ${expense.amount > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                ${expense.amount}
+                                BYN{expense.amount}
                             </td>
                             <td className="py-3 px-4 whitespace-nowrap">
                                 <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">

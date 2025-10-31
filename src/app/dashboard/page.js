@@ -8,19 +8,14 @@ import Link from 'next/link';
 export default function DashboardPage() {
   const [user, setUser] = useState(null);
   const [expenses, setExpenses] = useState([]);
-  const [income, setIncome] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState('month');
   const router = useRouter();
 
-  // safe parse helpers
   const safeNum = (v) => {
     const n = parseFloat(v);
     return Number.isFinite(n) ? n : 0;
   };
-
-  const totalExpenses = useMemo(() => expenses.reduce((s, e) => s + safeNum(e.amount), 0), [expenses]);
-  const totalIncome = useMemo(() => income.reduce((s, i) => s + safeNum(i.amount), 0), [income]);
-  const balance = totalIncome - totalExpenses;
 
   useEffect(() => {
     let mounted = true;
@@ -32,24 +27,13 @@ export default function DashboardPage() {
         if (u) {
           setUser(u);
 
-          // NOTE: Увеличение лимита для более полезных трендов, например, до 12
-          const [expensesResponse, incomeResponse] = await Promise.all([
-            supabase
+          const { error, data: expensesData } = await supabase
               .from('expenses')
               .select('*')
               .eq('user_id', u.id)
-              .order('date', { ascending: false })
-              .limit(12), // Увеличен лимит
-            supabase
-              .from('income')
-              .select('*')
-              .eq('user_id', u.id)
-              .order('date', { ascending: false })
-              .limit(12), // Увеличен лимит
-          ]);
+              .order('date', { ascending: false });
 
-          if (!expensesResponse.error) setExpenses(expensesResponse.data || []);
-          if (!incomeResponse.error) setIncome(incomeResponse.data || []);
+          if (!error) setExpenses(expensesData || []);
         } else {
           router.push('/login');
         }
@@ -66,6 +50,26 @@ export default function DashboardPage() {
     };
   }, [router]);
 
+  const filteredExpenses = useMemo(() => {
+    const now = new Date();
+    return expenses.filter(expense => {
+      const expenseDate = new Date(expense.date);
+      if (timeRange === 'week') {
+        const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
+        return expenseDate >= startOfWeek;
+      }
+      if (timeRange === 'month') {
+        return expenseDate.getMonth() === now.getMonth() && expenseDate.getFullYear() === now.getFullYear();
+      }
+      if (timeRange === 'year') {
+        return expenseDate.getFullYear() === now.getFullYear();
+      }
+      return true; // 'all'
+    });
+  }, [expenses, timeRange]);
+
+  const totalExpenses = useMemo(() => filteredExpenses.reduce((s, e) => s + safeNum(e.amount), 0), [filteredExpenses]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/login');
@@ -78,7 +82,6 @@ export default function DashboardPage() {
     return dt.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' });
   };
 
-  // small sparkline generator for cards (Wider for better visibility)
   const sparklinePath = (values = [], w = 120, h = 32) => {
     if (!values || values.length < 2) return '';
     const max = Math.max(...values);
@@ -86,9 +89,7 @@ export default function DashboardPage() {
     const range = max - min || 1;
     return values
       .map((v, i) => {
-        // Уменьшаем ширину линии для небольшого отступа
         const x = (i / (values.length - 1)) * w; 
-        // Инвертируем Y, чтобы низ был внизу SVG
         const y = h - ((v - min) / range) * h; 
         return `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
       })
@@ -108,27 +109,10 @@ export default function DashboardPage() {
 
   if (!user) return null;
 
-  // prepare sparkline data (using last 8-10 entries for a clearer trend)
-  const INCOME_HISTORY_LEN = 8;
-  const incomeTrend = income.map((i) => safeNum(i.amount)).slice(0, INCOME_HISTORY_LEN).reverse();
-  const expensesTrend = expenses.map((e) => safeNum(e.amount)).slice(0, INCOME_HISTORY_LEN).reverse();
+  const EXPENSES_HISTORY_LEN = 8;
+  const expensesTrend = expenses.map((e) => safeNum(e.amount)).slice(0, EXPENSES_HISTORY_LEN).reverse();
 
-  // Balance trend calculation (cumulative over last N entries, padded)
-  const maxLen = Math.max(incomeTrend.length, expensesTrend.length);
-  const paddedIncome = [...incomeTrend, ...Array(maxLen - incomeTrend.length).fill(0)];
-  const paddedExpenses = [...expensesTrend, ...Array(maxLen - expensesTrend.length).fill(0)];
-  
-  let currentBalance = 0; // Начинаем отсчет от 0 для тренда
-  const balanceTrend = paddedIncome.map((ci, i) => {
-    // Используем i-1 для получения предыдущего кумулятивного баланса
-    currentBalance = (i > 0 ? balanceTrend[i - 1] : 0) + ci - paddedExpenses[i];
-    return currentBalance;
-  });
-
-  const balanceSparkColor = balance >= 0 ? '#10b981' : '#f43f5e'; // Emerald/Rose 
-  
-  // Добавляем рубль/тенге/другой символ, если не указано
-  const currencySymbol = '$'; 
+  const currencySymbol = 'BYN '; 
   const formatAmount = (amount, sign = true) => 
     `${sign ? (amount >= 0 ? '+' : '-') : ''}${currencySymbol}${Math.abs(amount).toFixed(2)}`;
 
@@ -136,7 +120,6 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-slate-50 to-sky-50 p-4 sm:p-6 lg:p-10">
       <div className="max-w-7xl mx-auto">
-        {/* Topbar */}
         <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-10">
           <div>
             <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">
@@ -148,7 +131,6 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Поиск (увеличенная адаптивность) */}
             <div className="hidden lg:flex items-center bg-white border border-slate-200 rounded-full px-4 py-2 shadow-sm focus-within:ring-2 focus-within:ring-sky-500 focus-within:border-sky-500 transition-all">
               <svg className="w-5 h-5 text-slate-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35" />
@@ -157,7 +139,6 @@ export default function DashboardPage() {
               <input aria-label="search" placeholder="Поиск транзакций, чеков..." className="outline-none text-base text-slate-600 w-44 lg:w-64 bg-transparent" />
             </div>
 
-            {/* Профиль и Выход */}
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-400 to-indigo-500 flex items-center justify-center text-white font-semibold text-lg shadow-md hover:ring-4 ring-sky-300 transition-all cursor-pointer">
               {user.email?.charAt(0)?.toUpperCase()}
             </div>
@@ -174,36 +155,19 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        {/* --- */}
+        <div className="flex justify-end mb-4">
+            <div className="flex items-center gap-2 p-1 rounded-lg bg-gray-100">
+                <button onClick={() => setTimeRange('week')} className={`px-3 py-1 text-sm font-semibold rounded-md transition-colors ${timeRange === 'week' ? 'bg-white text-teal-600 shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Неделя</button>
+                <button onClick={() => setTimeRange('month')} className={`px-3 py-1 text-sm font-semibold rounded-md transition-colors ${timeRange === 'month' ? 'bg-white text-teal-600 shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Месяц</button>
+                <button onClick={() => setTimeRange('year')} className={`px-3 py-1 text-sm font-semibold rounded-md transition-colors ${timeRange === 'year' ? 'bg-white text-teal-600 shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Год</button>
+                <button onClick={() => setTimeRange('all')} className={`px-3 py-1 text-sm font-semibold rounded-md transition-colors ${timeRange === 'all' ? 'bg-white text-teal-600 shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Все время</button>
+            </div>
+        </div>
 
-        {/* Stats - Адаптивная сетка, более крупные иконки */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
           
-          {/* Баланс */}
           <StatCard 
-            title="Текущий Баланс" 
-            amount={formatAmount(balance, false)} 
-            color={balance >= 0 ? 'text-emerald-600' : 'text-rose-600'} 
-            sparkColor={balanceSparkColor}
-            trendData={balanceTrend}
-            icon={BalanceIcon}
-            sparklinePath={sparklinePath}
-          />
-          
-          {/* Доходы */}
-          <StatCard 
-            title="Общие Доходы" 
-            amount={formatAmount(totalIncome, false)} 
-            color="text-emerald-600" 
-            sparkColor="#10b981"
-            trendData={incomeTrend}
-            icon={IncomeIcon}
-            sparklinePath={sparklinePath}
-          />
-
-          {/* Расходы */}
-          <StatCard 
-            title="Общие Расходы" 
+            title="Общие Расходы"
             amount={formatAmount(totalExpenses, false)} 
             color="text-rose-600" 
             sparkColor="#f43f5e"
@@ -212,54 +176,35 @@ export default function DashboardPage() {
             sparklinePath={sparklinePath}
           />
 
-          {/* Транзакции */}
           <StatCard 
-            title="Транзакций (Недавних)" 
-            amount={expenses.length + income.length} 
+            title="Транзакций"
+            amount={filteredExpenses.length} 
             color="text-sky-600" 
             sparkColor="#0ea5e9"
-            trendData={[]} // Для этого блока тренд не нужен
+            trendData={[]}
             icon={TransactionIcon}
             sparklinePath={sparklinePath}
           >
-            <p className="mt-3 text-xs text-slate-500">Последние {expenses.length + income.length} операций</p>
+            <p className="mt-3 text-xs text-slate-500">за выбранный период</p>
           </StatCard>
         </section>
 
-        {/* --- */}
-
-        {/* Quick actions - Более выразительные карточки */}
         <nav className="mb-10">
           <h2 className="text-xl font-bold text-slate-800 mb-4">Быстрые действия</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
             <ActionCard href="/expenses/add" title="Добавить расход" bg="bg-rose-50" textColor="text-rose-600" icon={ExpenseIcon} />
-            <ActionCard href="/income/add" title="Добавить доход" bg="bg-emerald-50" textColor="text-emerald-600" icon={IncomeIcon} />
-            <ActionCard href="/receipts/upload" title="Загрузить чек" bg="bg-purple-50" textColor="text-purple-600" icon={UploadIcon} />
-            <ActionCard href="/payments/manage" title="Платежи" bg="bg-indigo-50" textColor="text-indigo-600" icon={CardIcon} />
+            <ActionCard href="/receipts" title="Сканировать чек" bg="bg-purple-50" textColor="text-purple-600" icon={UploadIcon} />
+            <ActionCard href="/expenses/recurring" title="Регулярные" bg="bg-indigo-50" textColor="text-indigo-600" icon={CardIcon} />
             <ActionCard href="/reports" title="Отчёты" bg="bg-yellow-50" textColor="text-yellow-600" icon={ReportIcon} />
           </div>
         </nav>
-
-        {/* --- */}
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Recent Expenses */}
           <TransactionSection
             title="Последние расходы"
             link="/expenses"
             items={expenses}
             type="expense"
-            formatDate={formatDate}
-            safeNum={safeNum}
-            currencySymbol={currencySymbol}
-          />
-
-          {/* Recent Income */}
-          <TransactionSection
-            title="Последние доходы"
-            link="/income"
-            items={income}
-            type="income"
             formatDate={formatDate}
             safeNum={safeNum}
             currencySymbol={currencySymbol}
@@ -270,11 +215,6 @@ export default function DashboardPage() {
   );
 }
 
-/* ---------------------------------- */
-/* Вспомогательные компоненты для чистоты кода и переиспользования стилей */
-/* ---------------------------------- */
-
-// Карточка Статистики
 function StatCard({ title, amount, color, icon: Icon, sparkColor, trendData, sparklinePath, children }) {
   const showSparkline = trendData.length >= 2;
   return (
@@ -302,7 +242,6 @@ function StatCard({ title, amount, color, icon: Icon, sparkColor, trendData, spa
   );
 }
 
-// Карточка Быстрого Действия
 function ActionCard({ href, title, bg, textColor, icon: Icon }) {
   return (
     <Link href={href} className="group block bg-white border border-slate-100 rounded-xl p-4 text-center hover:shadow-lg hover:scale-[1.02] transition-all duration-200 active:scale-95">
@@ -314,7 +253,6 @@ function ActionCard({ href, title, bg, textColor, icon: Icon }) {
   );
 }
 
-// Секция Транзакций (Расход/Доход)
 function TransactionSection({ title, link, items, type, formatDate, safeNum, currencySymbol }) {
   const isExpense = type === 'expense';
   const color = isExpense ? 'text-rose-600' : 'text-emerald-600';
@@ -356,7 +294,6 @@ function TransactionSection({ title, link, items, type, formatDate, safeNum, cur
   );
 }
 
-// Empty State
 function EmptyState({ message }) {
   return (
     <div className="py-10 text-center text-slate-500 bg-slate-50 rounded-xl m-2 border border-dashed border-slate-200">
@@ -372,15 +309,9 @@ function EmptyState({ message }) {
 }
 
 
-/* SVG Icons */
 const BalanceIcon = (props) => (
   <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2M12 21a9 9 0 110-18 9 9 0 010 18z" />
-  </svg>
-);
-const IncomeIcon = (props) => (
-  <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2M12 21V3m-4 8l4-4 4 4" />
   </svg>
 );
 const ExpenseIcon = (props) => (

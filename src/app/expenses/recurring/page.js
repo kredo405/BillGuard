@@ -1,13 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-// Исходные импорты '@/lib/supabase' и 'next/navigation' были заменены заглушками для работы в Canvas.
-
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
-// Компонент InputField, перенесенный для обеспечения единообразия стиля
-const InputField = ({ label, id, type = 'text', value, onChange, required = false, placeholder = '' }) => (
+const InputField = ({ label, id, type = 'text', value, onChange, required = false, placeholder = '', list = '' }) => (
   <div className="space-y-1">
     <label htmlFor={id} className="block text-sm font-medium text-gray-700">
       {label}
@@ -19,9 +16,9 @@ const InputField = ({ label, id, type = 'text', value, onChange, required = fals
       value={value}
       onChange={onChange}
       placeholder={placeholder}
-      // Убедимся, что при вводе чисел используется корректный формат
+      list={list}
       {...(type === 'number' && { step: "0.01" })}
-      className="w-full p-3 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-4 focus:ring-teal-500/50 focus:border-teal-500 transition duration-150 ease-in-out"
+      className="w-full p-3 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-4 focus:ring-teal-500/50 focus:border-teal-500 transition duration-150 ease-in-out text-gray-900"
       required={required}
     />
   </div>
@@ -29,27 +26,29 @@ const InputField = ({ label, id, type = 'text', value, onChange, required = fals
 
 export default function ManagePaymentsPage() {
   const [user, setUser] = useState(null);
-  const [payments, setPayments] = useState([]);
+  const [expenses, setExpenses] = useState([]);
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [type, setType] = useState('loan'); // loan, installment, other
+  const [date, setDate] = useState('');
+  const [category, setCategory] = useState('Кредит');
+  const [categories, setCategories] = useState([]);
   const [message, setMessage] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  // Отдельная функция для получения и обновления списка платежей
-  const fetchPayments = async (userId) => {
-    const { data: paymentsData, error } = await supabase
-      .from('payments')
+  const fetchExpenses = async (userId) => {
+    const { data: expensesData, error } = await supabase
+      .from('expenses')
       .select('*')
       .eq('user_id', userId)
-      .order('due_date', { ascending: true }); // Моковая функция order теперь работает с сортировкой payments_mock
+      .order('date', { ascending: true });
 
     if (error) {
-      console.error('Error fetching payments:', error);
+      console.error('Error fetching expenses:', error);
     } else {
-      setPayments(paymentsData);
+      setExpenses(expensesData);
+      const uniqueCategories = [...new Set(expensesData.map(item => item.category))];
+      setCategories(uniqueCategories);
     }
   };
 
@@ -58,21 +57,20 @@ export default function ManagePaymentsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUser(user);
-        await fetchPayments(user.id);
+        await fetchExpenses(user.id);
       } else {
-        // router.push('/login'); // Закомментировано для среды Canvas
+        router.push('/login');
       }
     };
     fetchUser();
   }, [router]);
 
-  const handleAddPayment = async (e) => {
+  const handleAddExpense = async (e) => {
     e.preventDefault();
     setMessage(null);
     setIsLoading(true);
 
-    // Basic validation
-    if (!description || !amount || !dueDate) {
+    if (!description || !amount || !date) {
         setMessage('Пожалуйста, заполните все обязательные поля.');
         setIsLoading(false);
         return;
@@ -81,25 +79,24 @@ export default function ManagePaymentsPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { error } = await supabase.from('payments').insert([
-          { description, amount: parseFloat(amount), due_date: dueDate, type, user_id: user.id },
+        const { error } = await supabase.from('expenses').insert([
+          { description, amount: parseFloat(amount), date: date, category, user_id: user.id },
         ]);
         if (error) {
-          setMessage(`Ошибка при добавлении платежа: ${error.message}`);
+          setMessage(`Ошибка при добавлении расхода: ${error.message}`);
         } else {
-          setMessage('Платеж успешно добавлен!');
+          setMessage('Расход успешно добавлен!');
           setDescription('');
           setAmount('');
-          setDueDate('');
-          // Обновляем список платежей, чтобы увидеть добавленный элемент
-          await fetchPayments(user.id);
+          setDate('');
+          await fetchExpenses(user.id);
         }
       } else {
-        setMessage('Вы должны быть авторизованы, чтобы добавить платеж.');
+        setMessage('Вы должны быть авторизованы, чтобы добавить расход.');
       }
     } catch (err) {
         console.error('Непредвиденная ошибка:', err);
-        setMessage('Непредвиденная ошибка при добавлении платежа.');
+        setMessage('Непредвиденная ошибка при добавлении расхода.');
     } finally {
       setIsLoading(false);
     }
@@ -115,19 +112,17 @@ export default function ManagePaymentsPage() {
 
   return (
     <div className="flex flex-col items-center min-h-screen py-8 bg-gray-50 p-4 sm:p-6">
-      {/* Main Card Container, styled like AddIncomePage */}
       <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl p-6 sm:p-10 border-t-8 border-teal-500 transform transition duration-300">
         <h1 className="text-3xl font-extrabold text-center text-gray-900 border-b pb-4 mb-8">
-          Управление Регулярными Платежами
+          Управление Расходами
         </h1>
 
-        {/* Add Payment Form */}
         <form
-          onSubmit={handleAddPayment}
+          onSubmit={handleAddExpense}
           className="w-full max-w-md mx-auto p-6 space-y-6 bg-teal-50/70 rounded-2xl shadow-xl mb-12"
         >
           <h2 className="text-2xl font-bold text-teal-800 border-b border-teal-200 pb-3">
-            Добавить Новый Платеж
+            Добавить Новый Расход
           </h2>
 
           <InputField
@@ -149,30 +144,34 @@ export default function ManagePaymentsPage() {
             placeholder="0.00"
           />
           <InputField
-            id="dueDate"
-            label="Дата Оплаты"
+            id="date"
+            label="Дата"
             type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
             required
           />
 
-          {/* Custom Select for Type, styled to match InputField */}
-          <div className="space-y-1">
-            <label htmlFor="type" className="block text-sm font-medium text-gray-700">Тип Платежа</label>
-            <select
-              id="type"
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              className="w-full p-3 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-4 focus:ring-teal-500/50 focus:border-teal-500 transition duration-150 ease-in-out"
-            >
-              <option value="loan">Кредит</option>
-              <option value="installment">Рассрочка</option>
-              <option value="other">Другое</option>
-            </select>
+          <div>
+            <label htmlFor="category" className="block text-sm font-medium text-gray-700">Категория</label>
+            <input
+              id="category"
+              type="text"
+              list="categories-list"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full p-3 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-4 focus:ring-teal-500/50 focus:border-teal-500 transition duration-150 ease-in-out text-gray-900"
+            />
+            <datalist id="categories-list">
+              {categories.map((cat) => (
+                <option key={cat} value={cat} />
+              ))}
+              <option value="Кредит" />
+              <option value="Рассрочка" />
+              <option value="Другое" />
+            </datalist>
           </div>
 
-          {/* Submit Button with Loading Spinner */}
           <button
             type="submit"
             className={`w-full py-3 text-white font-bold text-lg rounded-xl shadow-lg transition duration-300 ease-in-out transform hover:scale-[1.01] active:scale-[0.99]
@@ -189,11 +188,10 @@ export default function ManagePaymentsPage() {
                 <span>Загрузка...</span>
               </div>
             ) : (
-              'Добавить Платеж'
+              'Добавить Расход'
             )}
           </button>
 
-          {/* Message Display */}
           {message && (
             <div
               className={`p-3 rounded-xl text-center text-sm font-medium border
@@ -207,9 +205,8 @@ export default function ManagePaymentsPage() {
           )}
         </form>
 
-        {/* Payments Table */}
         <h2 className="text-2xl font-bold text-gray-700 mb-4 pt-4 border-t border-gray-100">
-          Ваши Платежи
+          Ваши Расходы
         </h2>
         <div className="w-full overflow-x-auto rounded-xl shadow-lg border border-gray-100">
           <table className="min-w-full bg-white">
@@ -217,24 +214,24 @@ export default function ManagePaymentsPage() {
               <tr>
                 <th className="text-left p-4 text-sm font-semibold text-teal-800 uppercase tracking-wider">Описание</th>
                 <th className="text-left p-4 text-sm font-semibold text-teal-800 uppercase tracking-wider">Сумма</th>
-                <th className="text-left p-4 text-sm font-semibold text-teal-800 uppercase tracking-wider">Дата Оплаты</th>
-                <th className="text-left p-4 text-sm font-semibold text-teal-800 uppercase tracking-wider">Тип</th>
+                <th className="text-left p-4 text-sm font-semibold text-teal-800 uppercase tracking-wider">Дата</th>
+                <th className="text-left p-4 text-sm font-semibold text-teal-800 uppercase tracking-wider">Категория</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {payments.length > 0 ? (
-                payments.map((payment) => (
-                  <tr key={payment.id} className="hover:bg-teal-50/50 transition-colors duration-150">
-                    <td className="p-4 whitespace-nowrap text-gray-800 font-medium">{payment.description}</td>
-                    <td className="p-4 whitespace-nowrap text-gray-600 font-mono">${parseFloat(payment.amount).toFixed(2)}</td>
-                    <td className="p-4 whitespace-nowrap text-gray-600">{payment.due_date}</td>
+              {expenses.length > 0 ? (
+                expenses.map((expense) => (
+                  <tr key={expense.id} className="hover:bg-teal-50/50 transition-colors duration-150">
+                    <td className="p-4 whitespace-nowrap text-gray-800 font-medium">{expense.description}</td>
+                    <td className="p-4 whitespace-nowrap text-gray-600 font-mono">BYN{parseFloat(expense.amount).toFixed(2)}</td>
+                    <td className="p-4 whitespace-nowrap text-gray-600">{expense.date}</td>
                     <td className="p-4 whitespace-nowrap">
                         <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider"
                             style={{
-                                backgroundColor: payment.type === 'loan' ? '#e0f7fa' : payment.type === 'installment' ? '#f0f4c3' : '#e3f2fd',
-                                color: payment.type === 'loan' ? '#006064' : payment.type === 'installment' ? '#558b2f' : '#1976d2'
+                                backgroundColor: expense.category === 'Кредит' ? '#e0f7fa' : expense.category === 'Рассрочка' ? '#f0f4c3' : '#e3f2fd',
+                                color: expense.category === 'Кредит' ? '#006064' : expense.category === 'Рассрочка' ? '#558b2f' : '#1976d2'
                             }}>
-                            {payment.type === 'loan' ? 'Кредит' : payment.type === 'installment' ? 'Рассрочка' : 'Другое'}
+                            {expense.category}
                         </span>
                     </td>
                   </tr>
@@ -242,7 +239,7 @@ export default function ManagePaymentsPage() {
               ) : (
                 <tr>
                   <td colSpan="4" className="p-4 text-center text-gray-500 italic">
-                      Нет записанных регулярных платежей. Добавьте первый платеж выше!
+                      Нет записанных расходов. Добавьте первый расход выше!
                   </td>
                 </tr>
               )}

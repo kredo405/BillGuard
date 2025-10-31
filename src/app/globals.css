@@ -24,3 +24,18 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Darker placeholders for better visibility */
+::placeholder {
+  color: #6b7280; /* gray-500 */
+  opacity: 1; /* Ensure opacity is not making it lighter */
+}
+
+/* Darker text for date inputs */
+input[type="date"] {
+    color: #111827; /* gray-900 */
+}
+
+select option[disabled] {
+  color: #9ca3af; /* gray-400 */
+}

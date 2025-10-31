@@ -3,7 +3,7 @@ import Navbar from '../components/Navbar';
 
 export const metadata = {
   title: "BillGuard - Personal Finance Tracker",
-  description: "Track your income, expenses, and payments.",
+  description: "Track your expenses, and payments.",
 };
 
 export default function RootLayout({ children }) {

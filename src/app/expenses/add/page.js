@@ -1,5 +1,5 @@
-"use client";
-import { useState } from "react";
+'use client';
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { PlusCircle, X } from "lucide-react";
@@ -8,21 +8,37 @@ export default function AddExpensePage() {
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
-  // Устанавливаем текущую дату по умолчанию
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]); 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [categories, setCategories] = useState([]);
 
   const router = useRouter();
 
-  const categories = [
-    "Еда", "Транспорт", "Развлечения", "Жилье", "Счета", "Прочее"
-  ];
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data, error } = await supabase
+          .from('expenses')
+          .select('category')
+          .eq('user_id', user.id);
+
+        if (error) {
+          console.error('Error fetching categories:', error);
+        } else {
+          const uniqueCategories = [...new Set(data.map(item => item.category))];
+          setCategories(uniqueCategories);
+        }
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   async function addExpense() {
     setErrorMsg("");
     
-    // Простая валидация
     if (!amount || amount <= 0 || !description || !date) {
         setErrorMsg("Пожалуйста, заполните все обязательные поля (Сумма, Описание, Дата) и убедитесь, что Сумма > 0.");
         return;
@@ -30,7 +46,6 @@ export default function AddExpensePage() {
 
     setIsSubmitting(true);
     
-    // Преобразование суммы в число
     const expenseAmount = parseFloat(amount);
     
     const { data: { user } } = await supabase.auth.getUser();
@@ -76,7 +91,6 @@ export default function AddExpensePage() {
             </button>
         </header>
 
-        {/* Сообщение об ошибке */}
         {errorMsg && (
             <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg flex items-center">
                 <span className="font-medium mr-2">Ой!</span> {errorMsg}
@@ -84,16 +98,15 @@ export default function AddExpensePage() {
         )}
 
         <div className="space-y-5">
-          {/* Поле Сумма */}
           <div>
             <label htmlFor="amount" className="block text-sm font-semibold text-gray-700 mb-1">
-              Сумма ($) <span className="text-red-500">*</span>
+              Сумма (BYN) <span className="text-red-500">*</span>
             </label>
             <input
               id="amount"
               type="number"
               placeholder="Введите сумму, например, 45.99"
-              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 sm:text-base"
+              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 sm:text-base text-gray-900"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               step="0.01"
@@ -101,7 +114,6 @@ export default function AddExpensePage() {
             />
           </div>
 
-          {/* Поле Описание */}
           <div>
             <label htmlFor="description" className="block text-sm font-semibold text-gray-700 mb-1">
               Описание <span className="text-red-500">*</span>
@@ -110,32 +122,33 @@ export default function AddExpensePage() {
               id="description"
               type="text"
               placeholder="Например, Обед в кафе"
-              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 sm:text-base"
+              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 sm:text-base text-gray-900"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               required
             />
           </div>
 
-          {/* Поле Категория (Select для UX) */}
           <div>
             <label htmlFor="category" className="block text-sm font-semibold text-gray-700 mb-1">
               Категория
             </label>
-            <select
-                id="category"
-                className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 sm:text-base bg-white appearance-none"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-            >
-                <option value="">Выберите категорию или введите свою</option>
-                {categories.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                ))}
-            </select>
+            <input
+              id="category"
+              type="text"
+              list="categories-list"
+              placeholder="Выберите или введите категорию"
+              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 sm:text-base text-gray-900"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            />
+            <datalist id="categories-list">
+              {categories.map((cat) => (
+                <option key={cat} value={cat} />
+              ))}
+            </datalist>
           </div>
           
-          {/* Поле Дата */}
           <div>
             <label htmlFor="date" className="block text-sm font-semibold text-gray-700 mb-1">
               Дата <span className="text-red-500">*</span>
@@ -150,7 +163,6 @@ export default function AddExpensePage() {
             />
           </div>
           
-          {/* Кнопка Добавить */}
           <button
             className={`w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-md text-white font-bold transition duration-300 ease-in-out ${
               isSubmitting

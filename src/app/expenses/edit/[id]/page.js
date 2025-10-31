@@ -1,105 +1,212 @@
-
-"use client";
+'use client';
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter, useParams } from "next/navigation";
+import { Save, X } from "lucide-react";
 
 export default function EditExpensePage() {
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [date, setDate] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [categories, setCategories] = useState([]);
   const router = useRouter();
   const { id } = useParams();
 
   useEffect(() => {
+    const fetchExpense = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("expenses")
+        .select("*")
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .single();
+      if (error) {
+        console.error("Error fetching expense:", error);
+      } else {
+        setAmount(data.amount);
+        setDescription(data.description);
+        setCategory(data.category);
+        setDate(data.date);
+      }
+    };
+
+    const fetchCategories = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data, error } = await supabase
+            .from('expenses')
+            .select('category')
+            .eq('user_id', user.id);
+  
+          if (error) {
+            console.error('Error fetching categories:', error);
+          } else {
+            const uniqueCategories = [...new Set(data.map(item => item.category))];
+            setCategories(uniqueCategories);
+          }
+        }
+      };
+
     if (id) {
       fetchExpense();
+      fetchCategories();
     }
   }, [id]);
 
-  async function fetchExpense() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from("expenses")
-      .select("*")
-      .eq("id", id)
-      .eq("user_id", user.id)
-      .single();
-    if (error) {
-      console.error("Error fetching expense:", error);
-    } else {
-      setAmount(data.amount);
-      setDescription(data.description);
-      setCategory(data.category);
-      setDate(data.date);
-    }
-  }
-
   async function updateExpense() {
+    setErrorMsg("");
+    
+    if (!amount || amount <= 0 || !description || !date) {
+        setErrorMsg("Пожалуйста, заполните все обязательные поля (Сумма, Описание, Дата) и убедитесь, что Сумма > 0.");
+        return;
+    }
+
+    setIsSubmitting(true);
+    
+    const expenseAmount = parseFloat(amount);
+    
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+
+    if (!user) {
+        setErrorMsg("Пожалуйста, войдите в систему, чтобы обновить расход.");
+        setIsSubmitting(false);
+        return;
+    }
 
     const { error } = await supabase
       .from("expenses")
-      .update({ amount, description, category, date })
+      .update({ amount: expenseAmount, description: description.trim(), category: category || "Без категории", date })
       .eq("id", id)
       .eq("user_id", user.id);
+      
     if (error) {
       console.error("Error updating expense:", error);
+      setErrorMsg(`Ошибка при обновлении: ${error.message}`);
     } else {
       router.push("/expenses");
     }
+    setIsSubmitting(false);
   }
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Edit Expense</h1>
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Amount</label>
-          <input
-            type="number"
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
+    <div className="min-h-screen bg-gray-50 flex items-start justify-center p-6">
+      <div className="w-full max-w-lg bg-white p-8 rounded-xl shadow-2xl border border-gray-100 mt-10">
+        <header className="mb-6 flex justify-between items-center">
+            <h1 className="text-3xl font-extrabold text-gray-800">
+                Редактировать Расход
+            </h1>
+            <button
+                onClick={() => router.push("/expenses")}
+                className="text-gray-400 hover:text-gray-600 transition"
+                aria-label="Отмена и закрытие"
+            >
+                <X className="w-6 h-6" />
+            </button>
+        </header>
+
+        {errorMsg && (
+            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg flex items-center">
+                <span className="font-medium mr-2">Ой!</span> {errorMsg}
+            </div>
+        )}
+
+        <div className="space-y-5">
+          <div>
+            <label htmlFor="amount" className="block text-sm font-semibold text-gray-700 mb-1">
+              Сумма (BYN) <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="amount"
+              type="number"
+              placeholder="Введите сумму, например, 45.99"
+              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 sm:text-base text-gray-900"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              step="0.01"
+              required
+            />
+          </div>
+
+          <div>
+            <label htmlFor="description" className="block text-sm font-semibold text-gray-700 mb-1">
+              Описание <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="description"
+              type="text"
+              placeholder="Например, Обед в кафе"
+              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 sm:text-base text-gray-900"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label htmlFor="category" className="block text-sm font-semibold text-gray-700 mb-1">
+              Категория
+            </label>
+            <input
+              id="category"
+              type="text"
+              list="categories-list"
+              placeholder="Выберите или введите категорию"
+              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 sm:text-base text-gray-900"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            />
+            <datalist id="categories-list">
+              {categories.map((cat) => (
+                <option key={cat} value={cat} />
+              ))}
+            </datalist>
+          </div>
+          
+          <div>
+            <label htmlFor="date" className="block text-sm font-semibold text-gray-700 mb-1">
+              Дата <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="date"
+              type="date"
+              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 sm:text-base"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              required
+            />
+          </div>
+          
+          <button
+            className={`w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-md text-white font-bold transition duration-300 ease-in-out ${
+              isSubmitting
+                ? "bg-indigo-400 cursor-not-allowed"
+                : "bg-indigo-600 hover:bg-indigo-700 transform hover:scale-[1.01]"
+            }`}
+            onClick={updateExpense}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Сохранение...
+                </>
+            ) : (
+                <>
+                  <Save className="w-5 h-5 mr-2" />
+                  Сохранить Изменения
+                </>
+            )}
+          </button>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Description</label>
-          <input
-            type="text"
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Category</label>
-          <input
-            type="text"
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Date</label>
-          <input
-            type="date"
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </div>
-        <button
-          className="bg-blue-500 text-white px-4 py-2 rounded-md"
-          onClick={updateExpense}
-        >
-          Update Expense
-        </button>
       </div>
     </div>
   );

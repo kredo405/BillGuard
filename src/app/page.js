@@ -1,8 +1,24 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 export default function HomePage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        router.push('/dashboard');
+      }
+    };
+
+    checkUser();
+  }, [router]);
+
   return (
     // Улучшенный фон и центрирование
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4 sm:p-8">
@@ -68,4 +84,3 @@ export default function HomePage() {
     </div>
   );
 }
-
